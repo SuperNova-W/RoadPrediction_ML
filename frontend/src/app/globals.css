@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * RoadLens semantic color system.
+ * Values are HSL triplets consumed by tailwind.config.ts.
+ * Adjust the brand here (and in src/lib/tokens.ts for chart hex values).
+ */
+@layer base {
+  :root {
+    /* Workspace: warm white surfaces, high-contrast ink */
+    --background: 45 25% 98%;
+    --foreground: 224 40% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 40% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 40% 10%;
+
+    /* Deep civic blue */
+    --primary: 226 62% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 15% 94%;
+    --secondary-foreground: 224 30% 18%;
+    --muted: 220 15% 95%;
+    --muted-foreground: 222 12% 42%;
+    --accent: 222 40% 95%;
+    --accent-foreground: 226 62% 32%;
+
+    /* Vermilion for urgent damage / destructive actions */
+    --destructive: 4 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    /* Teal for healthy / completed states */
+    --success: 158 73% 34%;
+    --success-foreground: 0 0% 100%;
+    /* Amber for medium priority */
+    --warning: 40 100% 37%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 220 14% 89%;
+    --input: 220 14% 85%;
+    --ring: 226 62% 42%;
+    --radius: 0.5rem;
+
+    /* Dark charcoal/midnight navigation chrome */
+    --navy: 224 45% 8%;
+    --navy-foreground: 220 20% 92%;
+    --navy-muted: 221 18% 62%;
+    --navy-border: 223 25% 17%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Metrics and table figures align vertically */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+/* Subtle engineering-grid motif for hero/section backgrounds */
+.bg-blueprint-grid {
+  background-image:
+    linear-gradient(to right, rgb(148 163 184 / 0.09) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(148 163 184 / 0.09) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+.bg-blueprint-grid-dark {
+  background-image:
+    linear-gradient(to right, rgb(148 163 184 / 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(148 163 184 / 0.07) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* MapLibre chrome adjustments */
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+}
+.maplibregl-popup-content {
+  @apply rounded-md border border-border p-0 shadow-overlay;
+}
+
+/* Reduced motion: suppress non-essential animation globally */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
