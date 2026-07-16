@@ -43,6 +43,9 @@ required attribution.
 | --- | --- |
 | `/` | Marketing site (hero scan animation, workflow, showcase, government/trust sections) |
 | `/dashboard` | KPIs, city map, damage distribution, trends, recent detections, fleet status |
+| `/executive` | Leadership brief: condition grade, budget vs. backlog, response times, district scorecard |
+| `/network` | Street-segment condition grades, distribution chart, filters, trends |
+| `/citizen-reports` | 311/portal intake matched to AI detections to avoid duplicate dispatches |
 | `/issues` | Filterable/searchable issue table with map view, bulk actions, row expansion |
 | `/issues/[id]` | Source image + animated bounding boxes, AI vs. human review, actions, timeline |
 | `/ingestion` | Drag-and-drop upload with simulated Uploading → … → Ready pipeline, fleet cards |
@@ -59,7 +62,8 @@ src/
 ├── app/
 │   ├── (marketing)/page.tsx      # landing page
 │   ├── (app)/                    # authenticated app (shared AppShell layout)
-│   │   ├── dashboard/ issues/ map/ ingestion/ work-orders/
+│   │   ├── dashboard/ executive/ issues/ map/ network/
+│   │   ├── citizen-reports/ ingestion/ work-orders/
 │   │   ├── reports/ integrations/ settings/
 │   │   ├── layout.tsx  loading.tsx  error.tsx
 │   └── layout.tsx  globals.css   # root layout, design tokens (CSS vars)

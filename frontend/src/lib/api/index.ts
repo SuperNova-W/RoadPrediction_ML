@@ -25,7 +25,18 @@ import {
   type WorkOrder,
   type WorkOrderStatus,
 } from "@/lib/types";
+import type {
+  CitizenReport,
+  CitizenReportStatus,
+  ExecutiveSummary,
+  RoadSegment,
+} from "@/lib/types";
 import { ACTIVITY, AUDIT_LOG, INTEGRATIONS, NOTIFICATIONS, TEAM } from "@/lib/mock/misc";
+import {
+  CITIZEN_REPORTS,
+  EXECUTIVE_SUMMARY,
+  ROAD_SEGMENTS,
+} from "@/lib/mock/government";
 import { DISTRICTS } from "@/lib/mock/districts";
 import { ISSUES } from "@/lib/mock/issues";
 import { DISTRICT_REPORT, MONTHLY_TRENDS, type DistrictReportRow } from "@/lib/mock/trends";
@@ -287,3 +298,67 @@ export const API_INFO = {
   product: BRAND.name,
   mode: "mock",
 } as const;
+
+/* ------------------------------------------------------------------ */
+/* Government-facing views                                             */
+/* ------------------------------------------------------------------ */
+
+const govStore = {
+  citizenReports: CITIZEN_REPORTS.map((r) => ({ ...r })),
+};
+
+export async function getRoadSegments(): Promise<RoadSegment[]> {
+  await delay();
+  return ROAD_SEGMENTS.map((s) => ({ ...s }));
+}
+
+export async function getExecutiveSummary(): Promise<ExecutiveSummary> {
+  await delay();
+  return EXECUTIVE_SUMMARY;
+}
+
+export async function getCitizenReports(): Promise<CitizenReport[]> {
+  await delay();
+  return govStore.citizenReports.map((r) => ({ ...r }));
+}
+
+/** Link a citizen report to an AI detection (demo, in-memory). */
+export async function matchCitizenReport(
+  reportId: string,
+  issueId: string,
+): Promise<CitizenReport> {
+  await delay(350);
+  const report = govStore.citizenReports.find((r) => r.id === reportId);
+  if (!report) throw new Error(`Report ${reportId} not found`);
+  report.status = "matched";
+  report.matchedIssueId = issueId;
+  return { ...report };
+}
+
+export async function setCitizenReportStatus(
+  reportId: string,
+  status: CitizenReportStatus,
+): Promise<CitizenReport> {
+  await delay(300);
+  const report = govStore.citizenReports.find((r) => r.id === reportId);
+  if (!report) throw new Error(`Report ${reportId} not found`);
+  report.status = status;
+  return { ...report };
+}
+
+/** Nearest open detections to a report, for the match-suggestion UI. */
+export async function suggestMatches(reportId: string): Promise<RoadIssue[]> {
+  await delay(250);
+  const report = govStore.citizenReports.find((r) => r.id === reportId);
+  if (!report) return [];
+  const dist = (a: [number, number], b: [number, number]) =>
+    Math.hypot(a[0] - b[0], a[1] - b[1]);
+  return store.issues
+    .filter((i) => i.reviewStatus !== "rejected")
+    .sort(
+      (a, b) =>
+        dist(a.coordinates, report.coordinates) -
+        dist(b.coordinates, report.coordinates),
+    )
+    .slice(0, 3);
+}

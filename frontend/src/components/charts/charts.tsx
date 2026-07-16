@@ -308,3 +308,133 @@ export function BacklogCostChart({ data }: { data: DistrictReportRow[] }) {
     </div>
   );
 }
+
+/** Estimated repair backlog over time (single series, currency axis). */
+export function BacklogTrendChart({
+  data,
+}: {
+  data: { label: string; backlog: number }[];
+}) {
+  const animate = !useReducedMotion();
+  return (
+    <div className="h-56 w-full">
+      <ResponsiveContainer>
+        <AreaChart data={data} margin={{ left: 4, right: 8, top: 6, bottom: 0 }}>
+          <CartesianGrid {...gridProps} />
+          <XAxis dataKey="label" {...axisProps} />
+          <YAxis
+            {...axisProps}
+            axisLine={false}
+            tickFormatter={(v: number) => formatCurrencyCompact(v)}
+            width={52}
+          />
+          <Tooltip content={<DefaultTooltip formatter={(v) => formatCurrencyCompact(v)} />} />
+          <Area
+            type="monotone"
+            dataKey="backlog"
+            name="Est. backlog"
+            stroke={SERIES.blue}
+            strokeWidth={2}
+            fill={SERIES.blue}
+            fillOpacity={0.12}
+            activeDot={{ r: 4, strokeWidth: 2, stroke: "#fff" }}
+            isAnimationActive={animate}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/** Median days from detection to review / repair, by severity. */
+export function ResponseTimeChart({
+  data,
+}: {
+  data: { severity: string; medianDaysToReview: number; medianDaysToRepair: number }[];
+}) {
+  const animate = !useReducedMotion();
+  const rows = data.map((d) => ({
+    ...d,
+    name: d.severity.charAt(0).toUpperCase() + d.severity.slice(1),
+  }));
+  return (
+    <div className="space-y-2">
+      <ChartLegend
+        items={[
+          { label: "Days to review", color: SERIES.blue },
+          { label: "Days to repair", color: SERIES.teal },
+        ]}
+      />
+      <div className="h-56 w-full">
+        <ResponsiveContainer>
+          <BarChart data={rows} margin={{ left: -16, right: 8, top: 14, bottom: 0 }}>
+            <CartesianGrid {...gridProps} />
+            <XAxis dataKey="name" {...axisProps} />
+            <YAxis {...axisProps} axisLine={false} />
+            <Tooltip
+              cursor={{ fill: CHART_INK.grid, opacity: 0.4 }}
+              content={<DefaultTooltip formatter={(v) => `${v} days`} />}
+            />
+            <Bar
+              dataKey="medianDaysToReview"
+              name="Days to review"
+              fill={SERIES.blue}
+              barSize={16}
+              radius={[4, 4, 0, 0]}
+              isAnimationActive={animate}
+            />
+            <Bar
+              dataKey="medianDaysToRepair"
+              name="Days to repair"
+              fill={SERIES.teal}
+              barSize={16}
+              radius={[4, 4, 0, 0]}
+              isAnimationActive={animate}
+            >
+              <LabelList
+                dataKey="medianDaysToRepair"
+                position="top"
+                formatter={(v: number) => `${v}d`}
+                style={{ fill: CHART_INK.label, fontSize: 11, fontVariantNumeric: "tabular-nums" }}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+/** Lane-miles by condition grade — ordered buckets on the ordinal ramp. */
+export function ConditionDistributionChart({
+  data,
+}: {
+  data: { grade: string; miles: number }[];
+}) {
+  const animate = !useReducedMotion();
+  return (
+    <div className="h-56 w-full">
+      <ResponsiveContainer>
+        <BarChart data={data} margin={{ left: -16, right: 8, top: 16, bottom: 0 }}>
+          <CartesianGrid {...gridProps} />
+          <XAxis dataKey="grade" {...axisProps} />
+          <YAxis {...axisProps} axisLine={false} />
+          <Tooltip
+            cursor={{ fill: CHART_INK.grid, opacity: 0.4 }}
+            content={<DefaultTooltip formatter={(v) => `${v} lane-miles`} />}
+          />
+          <Bar dataKey="miles" name="Lane-miles" barSize={32} radius={[4, 4, 0, 0]} isAnimationActive={animate}>
+            {data.map((d, i) => (
+              <Cell key={d.grade} fill={ORDINAL_BLUE[Math.min(i, ORDINAL_BLUE.length - 1)]} />
+            ))}
+            <LabelList
+              dataKey="miles"
+              position="top"
+              style={{ fill: CHART_INK.label, fontSize: 11, fontVariantNumeric: "tabular-nums" }}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

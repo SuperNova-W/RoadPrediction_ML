@@ -251,3 +251,63 @@ export interface IngestionJob {
   result: Detection[] | null;
   imageSeed: number;
 }
+
+/* ------------------------------------------------------------------ */
+/* Government-facing views: network condition, executive brief, 311    */
+/* ------------------------------------------------------------------ */
+
+export type ConditionGrade = "A" | "B" | "C" | "D" | "F";
+export type ConditionTrend = "improving" | "stable" | "declining";
+
+export interface RoadSegment {
+  id: string; // e.g. "SEG-104"
+  streetName: string;
+  district: string; // District id
+  lengthMiles: number;
+  /** 0-100 composite condition score (heuristic, not a certified PCI). */
+  conditionScore: number;
+  grade: ConditionGrade;
+  openIssues: number;
+  lastInspected: string; // ISO
+  trend: ConditionTrend;
+}
+
+export type CitizenReportStatus = "new" | "matched" | "converted" | "closed";
+export type CitizenReportChannel = "311 call" | "Web portal" | "Mobile app";
+
+export interface CitizenReport {
+  id: string; // e.g. "CR-118"
+  description: string;
+  category: string; // e.g. "Pothole", "Cracked pavement"
+  locationText: string;
+  coordinates: [number, number];
+  district: string;
+  submittedAt: string;
+  channel: CitizenReportChannel;
+  status: CitizenReportStatus;
+  /** Linked AI detection, when a match has been confirmed. */
+  matchedIssueId: string | null;
+  photoSeed: number | null; // procedural placeholder photo, if attached
+}
+
+export interface BudgetSummary {
+  fiscalYear: string; // "FY 2026"
+  allocated: number;
+  committed: number; // approved/scheduled work orders
+  spent: number; // completed work
+}
+
+export interface ResponseMetric {
+  severity: Severity;
+  medianDaysToReview: number;
+  medianDaysToRepair: number;
+}
+
+export interface ExecutiveSummary {
+  conditionScore: number; // network average, 0-100
+  conditionDelta: number; // vs prior quarter
+  budget: BudgetSummary;
+  response: ResponseMetric[];
+  backlogTrend: { label: string; backlog: number }[]; // monthly est. $ backlog
+  highlights: string[];
+}

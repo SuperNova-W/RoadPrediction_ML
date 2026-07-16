@@ -132,3 +132,23 @@ export function PriorityScore({
     </span>
   );
 }
+
+/** Letter-grade chip for road-segment condition (A/B teal, C amber, D/F red). */
+export function GradeChip({ grade }: { grade: string }) {
+  const tone =
+    grade === "A" || grade === "B"
+      ? "bg-success/10 text-success"
+      : grade === "C"
+        ? "bg-warning/10 text-warning"
+        : "bg-destructive/10 text-destructive";
+  return (
+    <span
+      className={cn(
+        "inline-flex h-6 w-6 items-center justify-center rounded-md text-sm font-bold",
+        tone,
+      )}
+    >
+      {grade}
+    </span>
+  );
+}
