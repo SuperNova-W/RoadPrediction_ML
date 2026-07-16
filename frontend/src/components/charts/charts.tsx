@@ -438,3 +438,129 @@ export function ConditionDistributionChart({
     </div>
   );
 }
+
+/** Tiny trend line for measure cards (no axes; value is shown as text). */
+export function Sparkline({
+  data,
+  good = true,
+}: {
+  data: number[];
+  good?: boolean;
+}) {
+  const animate = !useReducedMotion();
+  const rows = data.map((v, i) => ({ i, v }));
+  return (
+    <div className="h-10 w-full" aria-hidden>
+      <ResponsiveContainer>
+        <LineChart data={rows} margin={{ top: 4, bottom: 2, left: 2, right: 2 }}>
+          <Line
+            type="monotone"
+            dataKey="v"
+            stroke={good ? SERIES.teal : SERIES.amber}
+            strokeWidth={1.75}
+            dot={false}
+            isAnimationActive={animate}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/** Open issues by district — single measure; bars are clickable drill-downs. */
+export function DistrictSnapshotChart({
+  data,
+  selected,
+  onSelect,
+}: {
+  data: { id: string; name: string; count: number }[];
+  selected?: string | null;
+  onSelect?: (id: string | null) => void;
+}) {
+  const animate = !useReducedMotion();
+  return (
+    <div className="h-64 w-full">
+      <ResponsiveContainer>
+        <BarChart
+          data={data}
+          layout="vertical"
+          margin={{ left: 8, right: 40, top: 4, bottom: 0 }}
+        >
+          <XAxis type="number" hide />
+          <YAxis type="category" dataKey="name" width={110} {...axisProps} axisLine={false} />
+          <Tooltip
+            cursor={{ fill: CHART_INK.grid, opacity: 0.4 }}
+            content={<DefaultTooltip formatter={(v) => `${v} open issues`} />}
+          />
+          <Bar
+            dataKey="count"
+            name="Open issues"
+            barSize={18}
+            radius={[0, 4, 4, 0]}
+            isAnimationActive={animate}
+            cursor={onSelect ? "pointer" : undefined}
+            onClick={(entry: { id?: string }) => {
+              if (!onSelect || !entry?.id) return;
+              onSelect(selected === entry.id ? null : entry.id);
+            }}
+          >
+            {data.map((d) => (
+              <Cell
+                key={d.id}
+                fill={SERIES.blue}
+                opacity={selected && selected !== d.id ? 0.3 : 1}
+              />
+            ))}
+            <LabelList
+              dataKey="count"
+              position="right"
+              style={{ fill: CHART_INK.label, fontSize: 11, fontVariantNumeric: "tabular-nums" }}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/** Peer-cohort comparison; our municipality is highlighted, peers muted. */
+export function PeerBenchmarkChart({
+  rows,
+  formatter,
+}: {
+  rows: { name: string; value: number; isSelf: boolean }[];
+  formatter: (v: number) => string;
+}) {
+  const animate = !useReducedMotion();
+  return (
+    <div className="h-56 w-full">
+      <ResponsiveContainer>
+        <BarChart data={rows} layout="vertical" margin={{ left: 8, right: 56, top: 4, bottom: 0 }}>
+          <XAxis type="number" hide />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={110}
+            {...axisProps}
+            axisLine={false}
+          />
+          <Tooltip
+            cursor={{ fill: CHART_INK.grid, opacity: 0.4 }}
+            content={<DefaultTooltip formatter={formatter} />}
+          />
+          <Bar dataKey="value" name="Backlog / lane-mile" barSize={16} radius={[0, 4, 4, 0]} isAnimationActive={animate}>
+            {rows.map((r) => (
+              <Cell key={r.name} fill={r.isSelf ? SERIES.blue : "#94a3b8"} />
+            ))}
+            <LabelList
+              dataKey="value"
+              position="right"
+              formatter={formatter}
+              style={{ fill: CHART_INK.label, fontSize: 11, fontVariantNumeric: "tabular-nums" }}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

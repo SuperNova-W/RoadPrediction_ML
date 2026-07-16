@@ -89,10 +89,10 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
             <CommandItem
               onSelect={() => {
                 setOpen(false);
-                toast.info("Exports live on the Reports page", {
+                toast.info("Exports live on the Analytics page", {
                   description: "CSV export is available; PDF is demo-only.",
                 });
-                router.push("/reports");
+                router.push("/analytics");
               }}
             >
               <FileDown aria-hidden />

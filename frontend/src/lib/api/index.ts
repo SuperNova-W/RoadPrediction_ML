@@ -26,12 +26,15 @@ import {
   type WorkOrderStatus,
 } from "@/lib/types";
 import type {
+  PeerBenchmark,
+  PerformanceMeasure,
   CitizenReport,
   CitizenReportStatus,
   ExecutiveSummary,
   RoadSegment,
 } from "@/lib/types";
 import { ACTIVITY, AUDIT_LOG, INTEGRATIONS, NOTIFICATIONS, TEAM } from "@/lib/mock/misc";
+import { PEER_BENCHMARK, PERFORMANCE_MEASURES } from "@/lib/mock/analytics";
 import {
   CITIZEN_REPORTS,
   EXECUTIVE_SUMMARY,
@@ -361,4 +364,18 @@ export async function suggestMatches(reportId: string): Promise<RoadIssue[]> {
         dist(b.coordinates, report.coordinates),
     )
     .slice(0, 3);
+}
+
+/* ------------------------------------------------------------------ */
+/* Performance analytics                                               */
+/* ------------------------------------------------------------------ */
+
+export async function getPerformanceMeasures(): Promise<PerformanceMeasure[]> {
+  await delay();
+  return PERFORMANCE_MEASURES;
+}
+
+export async function getPeerBenchmark(): Promise<PeerBenchmark> {
+  await delay(300);
+  return PEER_BENCHMARK;
 }

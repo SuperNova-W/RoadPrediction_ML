@@ -51,7 +51,7 @@ required attribution.
 | `/ingestion` | Drag-and-drop upload with simulated Uploading → … → Ready pipeline, fleet cards |
 | `/map` | Full-screen operational map: clustering, heatmap, layer toggles, time slider, drawer |
 | `/work-orders` | Kanban board + table, crew assignment, status moves, linked detections |
-| `/reports` | District comparison, class trends, priority distribution, completion rate, CSV export |
+| `/analytics` | Open-performance style: measure cards with targets/status, drill-down tabs (Snapshot / Over time / Distribution / Records), peer benchmarking, data-transparency notes, CSV export (`/reports` redirects here) |
 | `/integrations` | Camera/GIS/AMS integration cards with configuration drawers |
 | `/settings` | Municipality profile, team & roles, thresholds, priority weights, audit log |
 
@@ -64,7 +64,7 @@ src/
 │   ├── (app)/                    # authenticated app (shared AppShell layout)
 │   │   ├── dashboard/ executive/ issues/ map/ network/
 │   │   ├── citizen-reports/ ingestion/ work-orders/
-│   │   ├── reports/ integrations/ settings/
+│   │   ├── analytics/ integrations/ settings/
 │   │   ├── layout.tsx  loading.tsx  error.tsx
 │   └── layout.tsx  globals.css   # root layout, design tokens (CSS vars)
 ├── components/

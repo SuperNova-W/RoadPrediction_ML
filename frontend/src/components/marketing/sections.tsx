@@ -456,7 +456,7 @@ export function Footer() {
           <ul className="mt-3 space-y-2 text-sm">
             <li><Link href="/dashboard" className="hover:text-white">Demo workspace</Link></li>
             <li><Link href="/map" className="hover:text-white">Operational map</Link></li>
-            <li><Link href="/reports" className="hover:text-white">Reports</Link></li>
+            <li><Link href="/analytics" className="hover:text-white">Analytics</Link></li>
           </ul>
         </div>
       </div>

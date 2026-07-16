@@ -30,7 +30,7 @@ export const APP_NAV: NavItem[] = [
   { label: "Citizen reports", href: "/citizen-reports", icon: Megaphone, description: "311 intake matched to AI detections" },
   { label: "Ingestion", href: "/ingestion", icon: UploadCloud, description: "Upload imagery and monitor fleet capture" },
   { label: "Work orders", href: "/work-orders", icon: ClipboardList, description: "Plan and track repairs" },
-  { label: "Reports", href: "/reports", icon: BarChart3, description: "Trends, comparisons, and exports" },
+  { label: "Analytics", href: "/analytics", icon: BarChart3, description: "Performance measures, drill-downs, benchmarks, exports" },
   { label: "Integrations", href: "/integrations", icon: Plug, description: "Cameras, GIS, and asset systems" },
   { label: "Settings", href: "/settings", icon: Settings, description: "Municipality, team, thresholds, audit" },
 ];

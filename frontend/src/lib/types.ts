@@ -311,3 +311,44 @@ export interface ExecutiveSummary {
   backlogTrend: { label: string; backlog: number }[]; // monthly est. $ backlog
   highlights: string[];
 }
+
+/* ------------------------------------------------------------------ */
+/* Performance analytics (measure cards, benchmarking)                 */
+/* ------------------------------------------------------------------ */
+
+export type MeasureStatus = "on_track" | "watch" | "off_track";
+
+/**
+ * A tracked performance measure in the style of government open-performance
+ * platforms: explicit target, computed status, reporting period, and a
+ * plain-language explanation of why the measure exists.
+ */
+export interface PerformanceMeasure {
+  id: string;
+  name: string;
+  whyItMatters: string;
+  value: number;
+  format: "percent" | "days" | "score" | "currency";
+  unitSuffix?: string; // e.g. "/ lane-mile"
+  target: number;
+  direction: "at_or_above" | "at_or_below";
+  status: MeasureStatus;
+  yoyDelta: string; // e.g. "+9 pts vs FY25"
+  yoyIsImprovement: boolean;
+  periodLabel: string; // last closed reporting period
+  updatedNote: string; // cadence + freshness
+  spark: number[]; // recent history for the card sparkline
+}
+
+export interface PeerBenchmarkRow {
+  name: string;
+  value: number;
+  isSelf: boolean;
+}
+
+export interface PeerBenchmark {
+  measureLabel: string;
+  unit: string;
+  cohortNote: string;
+  rows: PeerBenchmarkRow[];
+}
