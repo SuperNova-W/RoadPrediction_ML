@@ -1,5 +1,7 @@
 """Damage-class definitions shared across the project."""
 
+from typing import Final
+
 # Neural-network targets must be integer indices starting at zero.
 CLASS_TO_INDEX: dict[str, int] = {
     "D00": 0,  # Longitudinal crack
@@ -7,6 +9,10 @@ CLASS_TO_INDEX: dict[str, int] = {
     "D20": 2,  # Alligator crack
     "D40": 3,  # Pothole
 }
+
+# A tuple provides one immutable, consistently ordered class-name sequence for
+# datasets, models, metrics, and artifact schemas.
+CLASS_NAMES: Final[tuple[str, ...]] = tuple(CLASS_TO_INDEX)
 
 # Reverse mapping used when converting model predictions back to labels.
 INDEX_TO_CLASS: dict[int, str] = {

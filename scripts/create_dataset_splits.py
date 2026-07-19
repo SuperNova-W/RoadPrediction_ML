@@ -8,6 +8,9 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from src.datasets.record_integrity import assert_record_sets_disjoint
+from src.utils.experiment_artifacts import write_csv_atomic
+
 
 MANIFEST_PATH = Path("data/processed/image_manifest.csv")
 OUTPUT_DIRECTORY = Path("data/splits")
@@ -96,21 +99,15 @@ def verify_no_group_leakage(
 ) -> None:
     """Ensure a sequence group appears in only one split."""
 
-    group_splits: dict[str, set[str]] = defaultdict(set)
-
-    for row in rows:
-        group_splits[row["sequence_group"]].add(row["split"])
-
-    leaking_groups = {
-        group: splits
-        for group, splits in group_splits.items()
-        if len(splits) > 1
+    rows_by_split = {
+        split: [row for row in rows if row["split"] == split]
+        for split in ("train", "val", "test")
     }
-
-    if leaking_groups:
-        raise RuntimeError(
-            f"Sequence groups found in multiple splits: {leaking_groups}"
-        )
+    assert_record_sets_disjoint(
+        rows_by_split,
+        identity_fields=("sequence_group",),
+        description="Sequence groups found in multiple splits",
+    )
 
 
 def print_split_summary(rows: list[dict[str, str]]) -> None:
@@ -148,17 +145,7 @@ def write_split_files(rows: list[dict[str, str]]) -> None:
             row for row in rows if row["split"] == split
         ]
 
-        with output_path.open(
-            "w",
-            newline="",
-            encoding="utf-8",
-        ) as csv_file:
-            writer = csv.DictWriter(
-                csv_file,
-                fieldnames=fieldnames,
-            )
-            writer.writeheader()
-            writer.writerows(split_rows)
+        write_csv_atomic(output_path, fieldnames, split_rows)
 
         print(f"Wrote {output_path}")
 
