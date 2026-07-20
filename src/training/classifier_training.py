@@ -332,6 +332,7 @@ class SubprocessCertification:
     split: str | None = None
     batch_size: int = 32
     seed: int = 42
+    image_size: int = 224
     limit_batches: int | None = None
     python_executable: str = field(default_factory=lambda: sys.executable)
 
@@ -358,6 +359,8 @@ class SubprocessCertification:
             str(self.batch_size),
             "--seed",
             str(self.seed),
+            "--image-size",
+            str(self.image_size),
         ]
         if self.manifest_path is not None:
             command += ["--manifest", str(self.manifest_path)]

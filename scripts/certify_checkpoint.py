@@ -73,6 +73,12 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
+        "--image-size",
+        type=int,
+        default=224,
+        help="Square resize resolution; must match the training resolution.",
+    )
+    parser.add_argument(
         "--limit-batches",
         type=int,
         default=None,
@@ -83,6 +89,8 @@ def parse_arguments() -> argparse.Namespace:
 
     if args.batch_size <= 0:
         parser.error("--batch-size must be greater than zero")
+    if args.image_size <= 0:
+        parser.error("--image-size must be greater than zero")
     if args.limit_batches is not None and args.limit_batches <= 0:
         parser.error("--limit-batches must be greater than zero")
     if args.split is not None and args.crop_root is not None:
@@ -107,6 +115,7 @@ def build_certification_dataset(args: argparse.Namespace) -> tf.data.Dataset:
             batch_size=args.batch_size,
             shuffle=False,
             seed=args.seed,
+            image_size=(args.image_size, args.image_size),
         )
     else:
         dataset = load_split(
@@ -127,6 +136,15 @@ def main() -> None:
 
     import tensorflow as tf
     from tensorflow import keras
+
+    # Grow GPU memory on demand: this process shares the GPU with the parent
+    # trainer, so it must not try to reserve the whole device (which OOMs on
+    # CUDA). Must be set before the GPU is used.
+    for gpu in tf.config.list_physical_devices("GPU"):
+        try:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        except RuntimeError:
+            pass
 
     checkpoint_path = resolve_path(args.checkpoint)
     if not checkpoint_path.is_file():

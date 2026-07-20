@@ -1,4 +1,9 @@
-"""Train an EfficientNetV2-B1 damage classifier with two-stage transfer learning.
+"""Train an EfficientNetV2 damage classifier with two-stage transfer learning.
+
+The backbone (``--backbone b1|b3|s``) and input resolution (``--input-size``) are
+selectable; B1 @224 is the default. ConvNeXt is intentionally not an option here
+because its grouped convolutions force XLA JIT, which Apple Metal cannot run.
+
 
 This trainer targets accuracy, not the controlled A/B contrast of
 ``two_arm_experiment``. The two-arm study showed that including the Norway and
@@ -66,7 +71,6 @@ from scripts.two_arm_experiment import (
 
 
 DEFAULT_EXPERIMENTS_DIRECTORY = Path("outputs/experiments")
-INPUT_SHAPE = (224, 224, 3)
 
 
 def _banner(title: str) -> str:
@@ -262,11 +266,30 @@ def parse_arguments() -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(
         description=(
-            "Train an EfficientNetV2-B1 road-damage classifier with a frozen "
-            "head stage and a fine-tuning stage, using all countries."
+            "Train an EfficientNetV2 road-damage classifier (--backbone b1/b3/s, "
+            "--input-size) with a frozen head stage and a fine-tuning stage, "
+            "using all countries."
         )
     )
     parser.add_argument("--experiment-id", type=str, default=None)
+    parser.add_argument(
+        "--backbone",
+        choices=("b1", "b3", "s"),
+        default="b1",
+        help=(
+            "EfficientNetV2 backbone size. 's' (~20M params) has more capacity "
+            "than 'b1' (~8M) but is far slower to fine-tune on Apple Metal."
+        ),
+    )
+    parser.add_argument(
+        "--input-size",
+        type=int,
+        default=224,
+        help=(
+            "Square input resolution. 256 captures more native crop detail "
+            "(helps D20); most crops are <320px so 320 mostly upsamples."
+        ),
+    )
     parser.add_argument(
         "--square-dataset-directory",
         type=Path,
@@ -301,6 +324,16 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--frozen-learning-rate", type=float, default=1e-3)
     parser.add_argument("--fine-tune-learning-rate", type=float, default=1e-5)
     parser.add_argument("--dropout", type=float, default=0.30)
+    parser.add_argument(
+        "--mixed-precision",
+        choices=("true", "false"),
+        default="false",
+        help=(
+            "Enable mixed_float16 (Tensor Cores on NVIDIA GPUs). Value form so "
+            "it passes cleanly as a SageMaker hyperparameter. With it on, use a "
+            "looser --round-trip-tolerance (e.g. 1e-3) for fp16 jitter."
+        ),
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--early-stopping-patience", type=int, default=5)
     parser.add_argument("--round-trip-tolerance", type=float, default=1e-5)
@@ -322,11 +355,17 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--checkpoint-metric",
-        choices=("val_macro_f1", "val_balanced_accuracy", "val_loss"),
+        choices=(
+            "val_macro_f1",
+            "val_balanced_accuracy",
+            "val_accuracy",
+            "val_loss",
+        ),
         default="val_macro_f1",
         help=(
             "Validation metric that drives checkpointing and early stopping. "
-            "Macro-F1 (default) weights every class equally, unlike val_loss."
+            "Macro-F1 (default) weights every class equally; use val_accuracy "
+            "or val_loss when overall accuracy is the goal."
         ),
     )
     parser.add_argument(
@@ -360,6 +399,7 @@ def parse_arguments() -> argparse.Namespace:
         ("--fine-tune-batch-size", args.fine_tune_batch_size),
         ("--eval-batch-size", args.eval_batch_size),
         ("--early-stopping-patience", args.early_stopping_patience),
+        ("--input-size", args.input_size),
     ):
         if value <= 0:
             parser.error(f"{name} must be greater than zero")
@@ -468,6 +508,7 @@ def make_dataset(
     batch_size: int,
     shuffle: bool,
     seed: int,
+    image_size: tuple[int, int],
     take_batches: int | None = None,
 ) -> Any:
     """Build a manifest-driven dataset, optionally limited to the first batches."""
@@ -477,6 +518,7 @@ def make_dataset(
         batch_size=batch_size,
         shuffle=shuffle,
         seed=seed,
+        image_size=image_size,
     )
     if take_batches is not None:
         dataset = dataset.take(take_batches)
@@ -499,6 +541,7 @@ def fit_stage(
     monitor: str,
     monitor_mode: str,
     seed: int,
+    image_size: tuple[int, int],
     checkpoint_path: Path,
     csv_log_path: Path,
     tensorboard_path: Path,
@@ -524,6 +567,7 @@ def fit_stage(
         batch_size=batch_size,
         shuffle=True,
         seed=seed,
+        image_size=image_size,
         take_batches=2 if smoke_test else None,
     )
     compile_classifier(
@@ -607,7 +651,7 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
 
     from src.evaluation.evaluate_classifier import evaluate_classifier_records
     from src.models.efficientnet_v2 import (
-        build_efficientnet_v2_b1,
+        build_efficientnet_v2,
         count_trainable_parameters,
         unfreeze_backbone,
     )
@@ -619,7 +663,26 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
             "very slow; rerun with --allow-cpu only if that is intentional."
         )
 
-    print(_banner(f"EfficientNetV2-B1 transfer learning: {experiment_directory.name}"))
+    # Grow GPU memory on demand instead of grabbing it all up front. On CUDA the
+    # default is to reserve ~the whole device, which starves the certification
+    # subprocess that shares this GPU (it OOMs on a tiny allocation). Harmless on
+    # Metal's unified memory, required on CUDA. Must run before the GPU is used.
+    for gpu in gpus:
+        try:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        except RuntimeError:
+            pass  # already initialized — nothing to do
+
+    if args.mixed_precision == "true":
+        keras.mixed_precision.set_global_policy("mixed_float16")
+
+    input_shape = (args.input_size, args.input_size, 3)
+    image_size = (args.input_size, args.input_size)
+
+    print(_banner(
+        f"EfficientNetV2-{args.backbone.upper()} @ {args.input_size}px "
+        f"transfer learning: {experiment_directory.name}"
+    ))
     print(f"  experiment directory   : {project_relative(experiment_directory)}")
     print_environment(tf, keras, gpus)
 
@@ -670,6 +733,7 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
             batch_size=eval_batch_size,
             shuffle=False,
             seed=args.seed,
+            image_size=image_size,
             take_batches=1 if smoke_test else None,
         )
 
@@ -677,11 +741,15 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
         "created_at_utc": utc_now(),
         "project_root": PROJECT_ROOT.as_posix(),
         "experiment_id": experiment_directory.name,
-        "model": "efficientnet_v2_b1",
+        "model": f"efficientnet_v2_{args.backbone}",
+        "backbone": args.backbone,
         "backbone_weights": "imagenet",
-        "input_shape": list(INPUT_SHAPE),
+        "input_shape": list(input_shape),
+        "input_size": args.input_size,
         "training_countries": "all_countries_including_norway_and_india",
         "arguments": {
+            "backbone": args.backbone,
+            "input_size": args.input_size,
             "frozen_epochs": args.frozen_epochs,
             "fine_tune_epochs": args.fine_tune_epochs,
             "frozen_batch_size": args.frozen_batch_size,
@@ -690,6 +758,7 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
             "frozen_learning_rate": args.frozen_learning_rate,
             "fine_tune_learning_rate": args.fine_tune_learning_rate,
             "dropout": args.dropout,
+            "mixed_precision": args.mixed_precision,
             "seed": args.seed,
             "early_stopping_patience": args.early_stopping_patience,
             "round_trip_tolerance": args.round_trip_tolerance,
@@ -716,8 +785,9 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
     print_data_selection(selection, class_weights)
 
     keras.utils.set_random_seed(args.seed)
-    model, backbone = build_efficientnet_v2_b1(
-        input_shape=INPUT_SHAPE,
+    model, backbone = build_efficientnet_v2(
+        args.backbone,
+        input_shape=input_shape,
         dropout_rate=args.dropout,
     )
     print(_banner("Model architecture"))
@@ -745,6 +815,7 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
         monitor=monitor,
         monitor_mode=monitor_mode,
         seed=args.seed,
+        image_size=image_size,
         checkpoint_path=checkpoints_directory / "stage1_frozen_best.keras",
         csv_log_path=logs_directory / "stage1_frozen.csv",
         tensorboard_path=logs_directory / "tensorboard_stage1",
@@ -782,6 +853,7 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
             monitor=monitor,
             monitor_mode=monitor_mode,
             seed=args.seed,
+            image_size=image_size,
             checkpoint_path=checkpoints_directory / "stage2_finetune_best.keras",
             csv_log_path=logs_directory / "stage2_finetune.csv",
             tensorboard_path=logs_directory / "tensorboard_stage2",
@@ -809,6 +881,7 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
         crop_root=square_directory,
         batch_size=eval_batch_size,
         seed=args.seed,
+        image_size=args.input_size,
         limit_batches=1 if smoke_test else None,
     )
     reloaded_model, evidence = certify_saved_classifier(
@@ -822,7 +895,8 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
 
     training_metrics: dict[str, Any] = {
         "status": "round_trip_failed" if not round_trip["passed"] else "running",
-        "model": "efficientnet_v2_b1",
+        "model": f"efficientnet_v2_{args.backbone}",
+        "input_size": args.input_size,
         "stages": stages,
         "in_memory_internal_tune": dict(evidence["in_memory"]),
         "fresh_process_internal_tune": dict(evidence["reloaded"]),
@@ -859,6 +933,7 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
             batch_size=eval_batch_size,
             shuffle=False,
             seed=args.seed,
+            image_size=image_size,
         ),
         records=tune_evaluation_records,
         output_directory=experiment_directory / "internal_tune_evaluation",
@@ -866,7 +941,7 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
         batch_size=eval_batch_size,
         role="internal_tune",
         checkpoint_path=restored_checkpoint_path,
-        title="Internal Tune — EfficientNetV2-B1",
+        title=f"Internal Tune — EfficientNetV2-{args.backbone.upper()}",
     )
     fresh_tune_check = compare_metric_sets(
         dict(evidence["reloaded"]),
@@ -902,6 +977,7 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
             batch_size=eval_batch_size,
             shuffle=False,
             seed=args.seed,
+            image_size=image_size,
         ),
         records=holdout_evaluation_records,
         output_directory=experiment_directory / "us_holdout_evaluation",
@@ -909,7 +985,7 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
         batch_size=eval_batch_size,
         role="us_holdout",
         checkpoint_path=restored_checkpoint_path,
-        title="U.S. Holdout — EfficientNetV2-B1",
+        title=f"U.S. Holdout — EfficientNetV2-{args.backbone.upper()}",
     )
 
     training_metrics["status"] = "completed"
@@ -918,7 +994,8 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
     completion = {
         "status": "completed",
         "completed_at_utc": utc_now(),
-        "model": "efficientnet_v2_b1",
+        "model": f"efficientnet_v2_{args.backbone}",
+        "input_size": args.input_size,
         "round_trip_check": round_trip,
         "fresh_reloaded_internal_tune_check": fresh_tune_check,
         "restored_checkpoint": project_relative(restored_checkpoint_path),
@@ -934,7 +1011,10 @@ def train_efficientnet(args: argparse.Namespace, experiment_directory: Path) -> 
     )
     keras.backend.clear_session()
 
-    print(_banner("EfficientNetV2-B1 training completed"))
+    print(_banner(
+        f"EfficientNetV2-{args.backbone.upper()} @ {args.input_size}px "
+        "training completed"
+    ))
     print(f"  experiment directory : {project_relative(experiment_directory)}")
     print(f"  restored checkpoint  : {project_relative(restored_checkpoint_path)}")
     print(f"  holdout metrics      : {holdout_evaluation['metrics_path']}")
@@ -955,7 +1035,8 @@ def main() -> None:
     os.chdir(PROJECT_ROOT)
 
     experiment_id = args.experiment_id or (
-        "efficientnet_v2_b1_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+        f"efficientnet_v2_{args.backbone}_{args.input_size}_"
+        + datetime.now().strftime("%Y%m%d_%H%M%S")
     )
     experiment_directory = resolve_path(args.experiments_directory) / experiment_id
     if experiment_directory.exists():
