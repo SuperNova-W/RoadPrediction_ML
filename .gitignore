@@ -2,10 +2,10 @@
 __pycache__/
 *.py[cod]
 .DS_Store
+.vscode/
 
 # Large datasets and generated artifacts
 data/raw/
 data/processed/
 data/splits/
 outputs/
-

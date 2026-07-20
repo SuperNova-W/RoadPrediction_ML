@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import csv
 from collections import Counter
 from pathlib import Path
 
 from src.datasets.annotation_parser import parse_annotation
 from src.utils.classes import CLASS_TO_INDEX
+from src.utils.experiment_artifacts import write_csv_atomic
 
 
 DATASET_ROOT = Path("data/raw/RDD2022")
@@ -110,10 +110,7 @@ def main() -> None:
         "has_unknown_labels",
     ]
 
-    with OUTPUT_PATH.open("w", newline="", encoding="utf-8") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
+    write_csv_atomic(OUTPUT_PATH, fieldnames, rows)
 
     print("\nManifest complete")
     print("-----------------")
